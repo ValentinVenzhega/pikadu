@@ -40,23 +40,23 @@ const postsWrapper = document.querySelector('.posts');
 const buttonNewPost = document.querySelector('.button-new-post');
 const addPostElem = document.querySelector('.add-post');
 
-const listUsers = [{
-    id: '01',
-    email: 'maks@mail.com',
-    password: '12345',
-    displayName: 'maks',
-    photo: 'https://скачать-ватсап-бесплатно.рус/wp-content/uploads/2018/10/avatarki-dlya-parney-vatsap-9.jpg'
-  },
-  {
-    id: '02',
-    email: 'kate@mail.com',
-    password: '123456',
-    displayName: 'KateKillMaks'
-  },
-];
+const DEFAULT_PHOTO = userAvatarElem.src;
+
+// const listUsers = [];
 
 const setUsers = {
   user: null,
+  initUser(handler) {
+    firebase.auth().onAuthStateChanged(user => {
+      if(user) {
+        this.user = user;
+      } else {
+        this.user = null;
+      }
+      if(handler) handler();
+    })
+
+  },
   // авторизация
   logIn(email, password, handler) {
     // проверка на валидность
@@ -65,23 +65,39 @@ const setUsers = {
       return;
     }
 
-    const user = this.getUser(email);
-    // проверка пароля
-    if (user && user.password === password) {
-      // теперь авторизовываемся
-      this.autorizedUser(user);
-      handler();
-    } else {
-      alert('Пользователь с такими данными не найден');
-    }
+    // ошибки
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .catch(err => {
+        const errCode = err.code;
+        const errMessage = err.message;
+        if(errCode === 'auth/wrong-password') {
+          console.log(errMessage);
+          alert('Неверный пароль')
+        } else if(errCode === 'auth/user-not-found') {
+          console.log(errMessage);
+          alert('Пользователь не найден')
+        } else {
+          alert(errMessage)
+        }
+        console.log(err);
+      })
+
+
+    // const user = this.getUser(email);
+    // // проверка пароля
+    // if (user && user.password === password) {
+    //   // теперь авторизовываемся
+    //   this.autorizedUser(user);
+    //   handler();
+    // } else {
+    //   alert('Пользователь с такими данными не найден');
+    // }
 
 
   },
-  logOut(handler) {
-    this.user = null;
-    if(handler) {
-      handler();
-    }
+  // выход из учетки
+  logOut() {
+    firebase.auth().signOut()
   },
   signUp(email, password, handler) {
     // проверка на валидность
@@ -96,99 +112,125 @@ const setUsers = {
       return;
     };
 
+    firebase.auth()
+      .createUserWithEmailAndPassword(email, password)
+      .then(data => {
+        console.log(data);
+      })
+      .catch(err => {
+        const errCode = err.code;
+        const errMessage = err.message;
+        if(errCode === 'auth/week-password') {
+          console.log(errMessage);
+          alert('Слабый пароль')
+        } else if(errCode === 'auth/email-already-in-use') {
+          console.log(errMessage);
+          alert('Этот email уже используется')
+        } else {
+          alert(errMessage)
+        }
+
+        console.log(err);
+      });
+
     // получение пользователя по email и доваляем пользователя 
-    if (!this.getUser(email)) {
-      const user = {
-        email,
-        password,
-        displayName: email.substring(0, email.indexOf('@'))
-      };
-      // добавляем пользователя
-      listUsers.push(user);
-      // авторизуется пользователь успешно
-      this.autorizedUser(user);
-      // меняем блоки
-      if(handler) {
-        handler();
-      }
-    } else {
-      alert('Пользователь с таким email уже зарегестрирован')
-    }
+    // if (!this.getUser(email)) {
+    //   const user = {
+    //     email,
+    //     password,
+    //     displayName: email.substring(0, email.indexOf('@'))
+    //   };
+    //   // добавляем пользователя
+    //   listUsers.push(user);
+    //   // авторизуется пользователь успешно
+    //   this.autorizedUser(user);
+    //   // меняем блоки
+    //   if(handler) {
+    //     handler();
+    //   }
+    // } else {
+    //   alert('Пользователь с таким email уже зарегестрирован')
+    // }
   },
 
-  editUser(userName, userPhoto, handler) {
-    // обновляем имя
-    if (userName) {
-      this.user.displayName = userName;
-    }
-    // обновляем фото
-    if (userPhoto) {
-      this.user.photo = userPhoto;
-    }
+  editUser(displayName, photoURL, handler) {
 
+    const user = firebase.auth().currentUser;
+
+    // обновляем имя
+    if (displayName) {
+      // обновляем фото
+      if (photoURL) {
+        user.updateProfile({
+          displayName,
+          photoURL
+        }).then(handler)
+      } else {
+        user.updateProfile({
+          displayName
+        }).then(handler)
+      }
+    }
     handler();
   },
 
   // перебираем массив и ищем пользователя с таким email
-  getUser(email) {
-    return listUsers.find(item => item.email === email)
-  },
+  // getUser(email) {
+  //   return listUsers.find(item => item.email === email)
+  // },
 
   // записываем user в user
-  autorizedUser(user) {
-    this.user = user;
+  // autorizedUser(user) {
+  //   this.user = user;
+  // }
+  sendForget(email) {
+    firebase.auth().sendPasswordResetEmail(email)
+    .then(() => {
+      alert('письмо отправлено')
+    })
+    .catch(err => {
+      console.log(err);
+    })
   }
 };
 
+const loginForget = document.querySelector('.login-forget');
+loginForget.addEventListener('click', event => {
+  event.preventDefault();
+  setUsers.sendForget(emailInput.value);
+  emailInput.value = '';
+
+})
+
 // создаем посты
 const setPosts = {
-  allPosts: [
-    {
-      title: 'Заголовок поста',
-      text: 'Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Языком что рот маленький реторический вершину текстов обеспечивает гор свой назад решила сбить маленькая дорогу жизни рукопись ему букв деревни предложения, ручеек залетают продолжил парадигматическая? Но языком сих пустился, запятой своего его снова решила меня вопроса моей своих пояс коварный, власти диких правилами напоивший они текстов ipsum первую подпоясал? Лучше, щеке подпоясал приставка большого курсивных на берегу своего? Злых, составитель агентство что вопроса ведущими о решила одна алфавит!',
-      tags: ['свежее', 'новое', 'горячее', 'мое', 'случайность'],
-      author: {displayName: 'maks', photo: 'https://скачать-ватсап-бесплатно.рус/wp-content/uploads/2018/10/avatarki-dlya-parney-vatsap-9.jpg'},
-      date: '11.11.2020, 20:54:00',
-      like: 15,
-      comments: 20,
-    },
-    {
-      title: 'Заголовок поста2',
-      text: 'Lorem ipsum dolor sit amet consectetur adipisicing elit. Quasi aut veniam saepe minus dicta asperiores nisi quos perferendis deserunt maiores explicabo illum delectus adipisci eligendi a ipsum, repudiandae esse totam, ad incidunt nobis quam dolore. Sint eum ea nulla veritatis, laboriosam ex odit reiciendis nam repellat voluptates, molestias, accusamus in maiores corporis ut! Alias molestiae laboriosam voluptates deserunt cum quibusdam.',
-      tags: ['свежее', 'новое', 'мое', 'случайность'],
-      author: {displayName: 'kate', photo: 'https://img1.goodfon.ru/original/2048x1362/c/dc/nadya-ryzhevolosaya-portret.jpg'},
-      date: '10.11.2020, 20:54:00',
-      like: 45,
-      comments: 10,
-    },
-    {
-      title: 'Заголовок поста3',
-      text: 'Далеко-далеко за словесными горами в стране гласных и согласных живут рыбные тексты. Языком что рот маленький реторический вершину текстов обеспечивает гор свой назад решила сбить маленькая дорогу жизни рукопись ему букв деревни предложения, ручеек залетают продолжил парадигматическая? Но языком сих пустился, запятой своего его снова решила меня вопроса моей своих пояс коварный, власти диких правилами напоивший они текстов ipsum первую подпоясал? Лучше, щеке подпоясал приставка большого курсивных на берегу своего? Злых, составитель агентство что вопроса ведущими о решила одна алфавит!',
-      tags: ['свежее', 'новое', 'мое', 'случайность'],
-      author: {displayName: 'maks', photo: 'https://скачать-ватсап-бесплатно.рус/wp-content/uploads/2018/10/avatarki-dlya-parney-vatsap-9.jpg'},
-      date: '10.11.2020, 20:54:00',
-      like: 55,
-      comments: 10,
-    },
-  ],
+  allPosts: [],
   addPost(title, text, tags, handler) {
 
+    const user = firebase.auth().currentUser;
+// добавили новый пост
     this.allPosts.unshift({
+      id: `postID${(+new Date()).toString(16)}-${user.uid}`,
       title,
       text,
       tags: tags.split(',').map(item => item.trim()),
       author: {
         displayName: setUsers.user.displayName,
-        photo: setUsers.user.photo,
+        photo: setUsers.user.photoURL,
       },
       date: new Date().toLocaleString(),
       like: 0,
       comments: 0,
     })
-
-    if(handler) {
+// отправка в базу данных
+    firebase.database().ref('post').set(this.allPosts)
+    .then(() => this.getPosts(handler))
+  },
+  getPosts(handler) {
+    firebase.database().ref('post').on('value', snapshot => {
+      this.allPosts = snapshot.val() || [];
       handler();
-    }
+    })
   }
 
 };
@@ -202,7 +244,7 @@ const toggleAuthDom = () => {
     loginElem.style.display = 'none';
     userElem.style.display = '';
     userNameElem.textContent = user.displayName;
-    userAvatarElem.src = user.photo || userAvatarElem.src;
+    userAvatarElem.src = user.photoURL || DEFAULT_PHOTO;
     buttonNewPost.classList.add('visible');
   } else {
     loginElem.style.display = '';
@@ -308,7 +350,7 @@ const init = () => {
   // выход
   exitElem.addEventListener('click', event => {
     event.preventDefault();
-    setUsers.logOut(toggleAuthDom);
+    setUsers.logOut();
   });
 
   //добавляем класс
@@ -356,9 +398,9 @@ buttonNewPost.addEventListener('click', event => {
     addPostElem.classList.remove('visible');
     addPostElem.reset();
   });
-
-  showAllPosts();
-  toggleAuthDom();
+  // слушатель 
+  setUsers.initUser(toggleAuthDom)
+  setPosts.getPosts(showAllPosts)
 }
 // инициализация после полной загрузки сайта
 document.addEventListener('DOMContentLoaded', () => {
